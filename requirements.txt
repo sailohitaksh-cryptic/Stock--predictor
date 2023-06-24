@@ -1,4 +1,4 @@
-plotly==4.14.3
-yfinance==0.1.59
+plotly
+yfinance
 pmdarima
 pandas
