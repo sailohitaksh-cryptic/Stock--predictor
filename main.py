@@ -2,8 +2,8 @@ import streamlit as st
 from datetime import date
 
 import yfinance as yf
-from fbprophet import Prophet
-from fbprophet.plot import plot_plotly
+import pmdarima as pm
+import pandas as pd
 from plotly import graph_objs as go
 
 START = "2015-01-01"
@@ -41,21 +41,25 @@ def plot_raw_data():
 plot_raw_data()
 
 # Forecasting 
-df_train = data[["Date","Close"]]
-df_train = df_train.rename(columns={"Date":"ds","Close":"y"})
+df_train = data[["Date", "Close"]]
+df_train = df_train.rename(columns={"Date": "ds", "Close": "y"})
+df_train['ds'] = pd.to_datetime(df_train['ds'])
 
-m = Prophet()
-m.fit(df_train)
-future = m.make_future_dataframe(periods=period)
-forecast = m.predict(future)
+model = pm.auto_arima(df_train['y'], seasonal=False, suppress_warnings=True)
+forecast = model.predict(n_periods=period, return_conf_int=True)
+
+forecast_values = forecast[0]
+forecast_dates = pd.date_range(start=df_train['ds'].iloc[-1], periods=period + 1, freq='D')[1:]
+forecast_ci = forecast[1]
 
 st.subheader('Forecast Data')
-st.write(forecast.tail())
+st.write(forecast_values[-5:])
 
 st.write('Forecast Data')
-fig1=plot_plotly(m, forecast)
-st.plotly_chart(fig1)
-
-st.write('Forecast Components')
-fig2 = m.plot_components(forecast)
-st.write(fig2)
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=df_train['ds'], y=df_train['y'], name='Actual'))
+fig.add_trace(go.Scatter(x=forecast_dates, y=forecast_values, name='Forecast'))
+fig.add_trace(go.Scatter(x=forecast_dates, y=forecast_ci[:, 0], fill=None, mode='lines', line_color='blue', name='Lower CI'))
+fig.add_trace(go.Scatter(x=forecast_dates, y=forecast_ci[:, 1], fill='tonexty', mode='lines', line_color='red', name='Upper CI'))
+fig.update_layout(title_text='Forecast Data', xaxis_rangeslider_visible=True)
+st.plotly_chart(fig)
